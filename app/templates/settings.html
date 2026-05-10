@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}settings · boat.pulse{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">credentials</h2>
+    <span class="small muted">aus environment / portainer</span>
+  </div>
+  <p class="hint" style="margin-top:-6px;">
+    Secrets liegen ausschließlich in env vars — diese seite zeigt nur, ob sie gesetzt sind.
+    Setze sie in Portainer in den Container-Umgebungsvariablen.
+  </p>
+
+  <div class="cred-matrix">
+    <div class="key">
+      <b>TELEGRAM_BOT_TOKEN</b>
+      <small>BotFather → /newbot → Token kopieren</small>
+    </div>
+    <div class="source">env</div>
+    <div>{% if creds.telegram_bot_token %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}</div>
+
+    <div class="key">
+      <b>TELEGRAM_CHAT_ID</b>
+      <small>Bot anschreiben und <code>/getUpdates</code> aufrufen</small>
+    </div>
+    <div class="source">env</div>
+    <div>{% if creds.telegram_chat_id %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}</div>
+
+    <div class="key">
+      <b>RESEND_API_KEY</b>
+      <small>resend.com → API Keys → Create</small>
+    </div>
+    <div class="source">env</div>
+    <div>{% if creds.resend_api_key %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}</div>
+  </div>
+</div>
+
+<form class="stacked" method="post" action="/settings">
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">scheduling</h2>
+      <span class="small muted">gilt für alle targets</span>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label for="crawl_interval_minutes">crawl-intervall (minuten)</label>
+        <input type="number" min="1" max="10080" name="crawl_interval_minutes" id="crawl_interval_minutes" value="{{ settings.crawl_interval_minutes }}" />
+        <span class="hint">änderung greift sofort für alle aktiven targets.</span>
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <label>presets</label>
+        <div class="row-actions" style="margin-top:6px;">
+          <button type="button" class="btn tiny subtle" data-preset="5">5min</button>
+          <button type="button" class="btn tiny subtle" data-preset="15">15min</button>
+          <button type="button" class="btn tiny subtle" data-preset="30">30min</button>
+          <button type="button" class="btn tiny subtle" data-preset="60">1h</button>
+          <button type="button" class="btn tiny subtle" data-preset="360">6h</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">adressen</h2>
+      <span class="small muted">aus datenbank · ui-editierbar</span>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label for="resend_from">from-adresse</label>
+        <input type="email" name="resend_from" id="resend_from" value="{{ settings.resend_from }}" placeholder="boat@deinedomain.de" />
+        <span class="hint">muss in resend verifiziert sein.</span>
+      </div>
+      <div class="field">
+        <label for="resend_to">an-adresse</label>
+        <input type="email" name="resend_to" id="resend_to" value="{{ settings.resend_to }}" placeholder="du@example.com" />
+      </div>
+    </div>
+    <div class="actions-row" style="margin-top:18px;">
+      <button class="btn primary" type="submit">speichern</button>
+    </div>
+  </div>
+</form>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">test versand</h2>
+    <span class="small muted">setzt eine echte nachricht ab</span>
+  </div>
+  <div class="row-actions">
+    <form method="post" action="/settings/test-telegram"><button class="btn">telegram testen</button></form>
+    <form method="post" action="/settings/test-email"><button class="btn">email testen</button></form>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('[data-preset]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var input = document.getElementById('crawl_interval_minutes');
+      input.value = b.dataset.preset;
+      input.focus();
+    });
+  });
+</script>
+{% endblock %}

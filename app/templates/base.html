@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{% block title %}Boat Pulse{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" />
+<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}" />
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('boatpulse-theme');
+      var preferred = saved || 'dark';
+      document.documentElement.setAttribute('data-theme', preferred);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-row">
+    <div class="brand">
+      <span class="prompt">~$</span>
+      <span class="name">boat<b>.</b>pulse</span>
+      <span class="blink"></span>
+    </div>
+    <div class="masthead-nav">
+      <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">overview</a>
+      <a href="/tester" class="{% if request.url.path.startswith('/tester') %}active{% endif %}">tester</a>
+      <a href="/settings" class="{% if request.url.path.startswith('/settings') %}active{% endif %}">settings</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Theme wechseln" title="Theme wechseln">
+        <span id="theme-toggle-label">[light]</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+{% if flash %}
+  <div class="flash {{ flash.kind }}">{{ flash.msg }}</div>
+{% endif %}
+
+<main class="editorial">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="colophon">
+  <span class="prompt">$</span> boat.pulse · monitoring für konstanzer liegeplätze
+</footer>
+
+<script>
+  (function () {
+    var toggle = document.getElementById('theme-toggle');
+    var label = document.getElementById('theme-toggle-label');
+    function syncLabel() {
+      var current = document.documentElement.getAttribute('data-theme');
+      label.textContent = current === 'dark' ? '[light]' : '[dark]';
+    }
+    syncLabel();
+    toggle.addEventListener('click', function () {
+      var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', current);
+      try { localStorage.setItem('boatpulse-theme', current); } catch (e) {}
+      syncLabel();
+    });
+  })();
+
+  // Live countdown for "next crawl in ..." labels
+  (function () {
+    function fmt(diffMs) {
+      if (diffMs <= 0) return 'jetzt';
+      var s = Math.floor(diffMs / 1000);
+      var d = Math.floor(s / 86400); s -= d * 86400;
+      var h = Math.floor(s / 3600); s -= h * 3600;
+      var m = Math.floor(s / 60); s -= m * 60;
+      if (d > 0) return d + 'd ' + h + 'h';
+      if (h > 0) return h + 'h ' + (m < 10 ? '0' : '') + m + 'm';
+      if (m > 0) return m + 'm ' + (s < 10 ? '0' : '') + s + 's';
+      return s + 's';
+    }
+    function tick() {
+      var now = Date.now();
+      document.querySelectorAll('.countdown[data-next]').forEach(function (el) {
+        var t = Date.parse(el.getAttribute('data-next'));
+        if (isNaN(t)) return;
+        var diff = t - now;
+        el.textContent = (diff <= 0 ? 'jetzt' : 'in ' + fmt(diff));
+        el.classList.toggle('live', diff <= 5000);
+      });
+      document.querySelectorAll('.relative-time[data-at]').forEach(function (el) {
+        var t = Date.parse(el.getAttribute('data-at'));
+        if (isNaN(t)) return;
+        var diff = now - t;
+        if (diff < 0) diff = 0;
+        el.textContent = diff < 60000 ? 'vor ' + Math.floor(diff/1000) + 's'
+                       : diff < 3600000 ? 'vor ' + Math.floor(diff/60000) + 'm'
+                       : diff < 86400000 ? 'vor ' + Math.floor(diff/3600000) + 'h'
+                       : 'vor ' + Math.floor(diff/86400000) + 'd';
+      });
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+
+  // Color-code diff blocks (lines starting with + / -)
+  function colorizeDiff(pre) {
+    var raw = pre.dataset.raw || pre.textContent;
+    pre.dataset.raw = raw;
+    var html = raw.split('\n').map(function (line) {
+      var esc = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+        return '<span class="meta">' + esc + '</span>';
+      }
+      if (line.startsWith('+')) return '<span class="add">' + esc + '</span>';
+      if (line.startsWith('-')) return '<span class="del">' + esc + '</span>';
+      return esc;
+    }).join('\n');
+    pre.innerHTML = html;
+  }
+  document.querySelectorAll('pre.diff').forEach(colorizeDiff);
+
+  // -------------------------------------------------------------------------
+  // Inline crawl-now: fetch JSON, update pulse + status dot + snapshot in place
+  // -------------------------------------------------------------------------
+  function renderPulse(states) {
+    var html = '';
+    var emptyN = Math.max(0, 24 - states.length);
+    for (var i = 0; i < emptyN; i++) html += '<span class="tick empty"></span>';
+    states.forEach(function (s) { html += '<span class="tick ' + s + '"></span>'; });
+    return html;
+  }
+
+  function setDot(dot, status) {
+    if (!dot) return;
+    ['ok', 'err', 'idle', 'off'].forEach(function (c) { dot.classList.remove(c); });
+    if (status === 'ok') dot.classList.add('ok');
+    else if (status === 'error') dot.classList.add('err');
+    else dot.classList.add('idle');
+  }
+
+  function restoreButtonAfter(btn, ms) {
+    setTimeout(function () {
+      btn.classList.remove('done', 'fail');
+      btn.innerHTML = btn.dataset.originalLabel;
+      btn.disabled = false;
+    }, ms);
+  }
+
+  document.querySelectorAll('form.crawl-now').forEach(function (form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var btn = form.querySelector('.crawl-now-btn');
+      if (!btn) return;
+      var card = form.closest('.target-card') || form.closest('.detail-hero');
+      var pulseEl = card ? card.querySelector('.pulse') : null;
+      var statusDot = card ? card.querySelector('.status-dot') : null;
+      var lastCrawlSlot = card ? card.querySelector('.last-crawl') : null;
+      var nextCrawlSlot = card ? card.querySelector('.next-crawl') : null;
+      var changeCountEls = card ? card.querySelectorAll('.change-count') : [];
+      var allChangeCountEls = document.querySelectorAll('.change-count[data-card-id="' + (card ? card.dataset.targetId : '') + '"]');
+      var snapshotSlot = document.querySelector('.snapshot-slot');
+
+      if (!btn.dataset.originalLabel) btn.dataset.originalLabel = btn.innerHTML.trim();
+      btn.classList.remove('done', 'fail');
+      btn.classList.add('working');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>läuft';
+
+      // optimistic pending tick
+      if (pulseEl) {
+        var ticks = pulseEl.querySelectorAll('.tick');
+        if (ticks.length >= 24) ticks[0].remove();
+        var pending = document.createElement('span');
+        pending.className = 'tick pending tick-fresh';
+        pulseEl.appendChild(pending);
+      }
+
+      try {
+        var res = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('http ' + res.status);
+        var data = await res.json();
+
+        if (pulseEl && Array.isArray(data.pulse)) {
+          pulseEl.innerHTML = renderPulse(data.pulse);
+          var last = pulseEl.lastElementChild;
+          if (last) last.classList.add('tick-fresh');
+        }
+        setDot(statusDot, data.last_status);
+
+        if (lastCrawlSlot && data.last_crawl_at) {
+          lastCrawlSlot.innerHTML = '<span class="relative-time" data-at="' + data.last_crawl_at + '">vor 0s</span>';
+        }
+        if (nextCrawlSlot && data.next_run_at) {
+          nextCrawlSlot.innerHTML = '<span class="countdown" data-next="' + data.next_run_at + '">…</span>';
+        }
+        changeCountEls.forEach(function (el) { el.textContent = data.change_count; });
+
+        if (snapshotSlot && typeof data.snapshot_text === 'string' && data.snapshot_text.length > 0) {
+          var pre = snapshotSlot.querySelector('.snapshot-text');
+          if (!pre) {
+            snapshotSlot.innerHTML = '';
+            pre = document.createElement('pre');
+            pre.className = 'text snapshot-text';
+            snapshotSlot.appendChild(pre);
+          }
+          pre.textContent = data.snapshot_text;
+        }
+
+        if (data.had_change && card) card.classList.add('flash-change');
+
+        btn.classList.remove('working');
+        btn.classList.add(data.last_status === 'ok' ? 'done' : 'fail');
+        btn.innerHTML = data.last_status === 'ok' ? '✓ ok' : '× fail';
+        restoreButtonAfter(btn, data.last_status === 'ok' ? 1400 : 2400);
+      } catch (err) {
+        btn.classList.remove('working');
+        btn.classList.add('fail');
+        btn.innerHTML = '× fail';
+        restoreButtonAfter(btn, 2400);
+      }
+    });
+  });
+</script>
+</body>
+</html>

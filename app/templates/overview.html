@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}overview · boat.pulse{% endblock %}
+{% block content %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Targets</div>
+    <div class="value">{{ "%02d" % stats.targets }}</div>
+    <div class="sub">{{ stats.active }} aktiv · {{ stats.targets - stats.active }} pausiert</div>
+  </div>
+  <div class="stat">
+    <div class="label">Crawls insgesamt</div>
+    <div class="value">{{ stats.crawls }}</div>
+    <div class="sub">
+      {% if stats.last_crawl_at %}
+        letzter <span class="relative-time" data-at="{{ stats.last_crawl_at.isoformat() }}">…</span>
+      {% else %}<span class="muted">noch keine</span>{% endif %}
+    </div>
+  </div>
+  <div class="stat">
+    <div class="label">Änderungen</div>
+    <div class="value {% if stats.changes %}accent{% endif %}">{{ stats.changes }}</div>
+    <div class="sub">
+      {% if stats.last_change_at %}
+        letzte <span class="relative-time" data-at="{{ stats.last_change_at.isoformat() }}">…</span>
+      {% else %}<span class="muted">noch keine</span>{% endif %}
+    </div>
+  </div>
+  <div class="stat">
+    <div class="label">Intervall</div>
+    <div class="value accent">{{ interval_minutes }}<span class="small muted" style="font-size:14px;">min</span></div>
+    <div class="sub">global · <a href="/settings">ändern</a></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">targets</h2>
+    <a class="btn primary" href="/targets/new">+ neues target</a>
+  </div>
+
+  {% if not targets %}
+    <p class="empty-state">noch keine targets angelegt.</p>
+  {% else %}
+  <div class="target-list">
+    {% for t in targets %}
+      <div class="target-card {% if not t.enabled %}is-paused{% endif %}" data-target-id="{{ t.id }}">
+        <div class="idx">{{ "%02d" % loop.index }}</div>
+        <div class="body">
+          <div class="name">
+            <span class="status-dot {% if not t.enabled %}off{% elif t.last_status == 'ok' %}ok{% elif t.last_status == 'error' %}err{% else %}idle{% endif %}"></span>
+            <a href="/targets/{{ t.id }}">{{ t.name }}</a>
+          </div>
+          <a class="url" href="{{ t.url }}" target="_blank" rel="noopener">{{ t.url }}</a>
+          <div class="meta">
+            <div>
+              <span class="label">last</span>
+              <span class="last-crawl">
+                {% if t.last_crawl_at %}<span class="relative-time" data-at="{{ t.last_crawl_at.isoformat() }}">…</span>
+                {% else %}<span class="muted">nie</span>{% endif %}
+              </span>
+            </div>
+            <div>
+              <span class="label">next</span>
+              <span class="next-crawl">
+                {% if t.next_run_at %}<span class="countdown" data-next="{{ t.next_run_at.isoformat() }}">…</span>
+                {% else %}<span class="muted">—</span>{% endif %}
+              </span>
+            </div>
+            <div>
+              <span class="label">pulse</span>
+              <span class="pulse">
+                {% set len = t.pulse|length %}
+                {% for _ in range(24 - len) %}<span class="tick empty"></span>{% endfor %}
+                {% for s in t.pulse %}<span class="tick {{ s }}"></span>{% endfor %}
+              </span>
+            </div>
+            <div><span class="label">Δ</span><span class="change-count">{{ t.change_count }}</span></div>
+          </div>
+          {% if t.selectors %}
+            <div class="selectors">
+              {% for s in t.selectors %}<code class="sel">{{ s }}</code>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        <div class="actions">
+          <div class="actions-row">
+            <form method="post" action="/targets/{{ t.id }}/crawl-now" class="crawl-now"><button class="btn tiny primary crawl-now-btn">crawl jetzt</button></form>
+            <a class="btn tiny" href="/targets/{{ t.id }}">öffnen</a>
+            <a class="btn tiny subtle" href="/targets/{{ t.id }}/edit">edit</a>
+          </div>
+          <div class="actions-row">
+            <form method="post" action="/targets/{{ t.id }}/toggle"><button class="btn tiny subtle">{% if t.enabled %}pause{% else %}wake{% endif %}</button></form>
+            <form method="post" action="/targets/{{ t.id }}/delete" onsubmit="return confirm('Target wirklich löschen?');"><button class="btn tiny danger">×</button></form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

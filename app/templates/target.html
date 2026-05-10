@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ target.name }} · boat.pulse{% endblock %}
+{% block content %}
+
+<div class="detail-hero" data-target-id="{{ target.id }}">
+  <div class="meta">
+    <span class="status-dot {% if not target.enabled %}off{% elif target.last_status == 'ok' %}ok{% elif target.last_status == 'error' %}err{% else %}idle{% endif %}"></span>
+    target № {{ "%02d" % target.id }}
+    <span class="muted">·</span>
+    {% if target.enabled %}<span class="badge on">active</span>{% else %}<span class="badge off">paused</span>{% endif %}
+    <span class="muted">·</span>
+    <span>Δ <span class="change-count">{{ changes|length }}</span></span>
+  </div>
+  <h1>{{ target.name }}</h1>
+  <a class="target-url" href="{{ target.url }}" target="_blank" rel="noopener">{{ target.url }}</a>
+  <div class="props">
+    <div><span class="label">interval</span>{{ interval_minutes }}min <span class="muted">(global)</span></div>
+    <div>
+      <span class="label">last</span>
+      <span class="last-crawl">
+        {% if target.last_crawl_at %}<span class="relative-time" data-at="{{ target.last_crawl_at.isoformat() }}">…</span>
+        {% else %}<span class="muted">nie</span>{% endif %}
+      </span>
+    </div>
+    <div>
+      <span class="label">next</span>
+      <span class="next-crawl">
+        {% if next_run_at %}<span class="countdown" data-next="{{ next_run_at.isoformat() }}">…</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </span>
+    </div>
+    <div>
+      <span class="label">pulse</span>
+      <span class="pulse">
+        {% set len = pulse|length %}
+        {% for _ in range(24 - len) %}<span class="tick empty"></span>{% endfor %}
+        {% for s in pulse %}<span class="tick {{ s }}"></span>{% endfor %}
+      </span>
+    </div>
+    <div>
+      <span class="label">selectors</span>
+      {% if target.selectors %}{% for s in target.selectors %}<code class="sel">{{ s }}</code>{% endfor %}
+      {% else %}<span class="muted">auto / json</span>{% endif %}
+    </div>
+  </div>
+  <div class="row-actions">
+    <form method="post" action="/targets/{{ target.id }}/crawl-now" class="crawl-now"><button class="btn primary crawl-now-btn">crawl jetzt</button></form>
+    <a class="btn" href="/targets/{{ target.id }}/edit">bearbeiten</a>
+    <a class="btn subtle" href="/">← overview</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">letzter snapshot</h2>
+    {% if latest_ok_crawl_at %}
+      <span class="small muted">
+        <span class="relative-time" data-at="{{ latest_ok_crawl_at.isoformat() }}">…</span>
+        · {{ latest_ok_crawl_at.strftime('%d.%m.%Y %H:%M UTC') }}
+      </span>
+    {% endif %}
+  </div>
+  <div class="snapshot-slot">
+  {% if latest_text %}
+    <pre class="text snapshot-text">{{ latest_text }}</pre>
+  {% elif latest_text is not none %}
+    <div class="callout">
+      <strong>Selektor-Bereich leer.</strong>
+      Der Crawl war technisch erfolgreich (HTTP 200), aber der konfigurierte Selektor lieferte keinen Text.
+      Wahrscheinlich rendert die Seite ihren Inhalt erst per JavaScript nach (SPA) — ein einfacher HTTP-GET liefert nur das leere Gerüst.
+      Lösung: in den Browser-DevTools im Network-Tab nachsehen, welcher XHR-Call die echten Daten lädt, und dessen URL als Target setzen.
+    </div>
+  {% else %}
+    <p class="empty-state">noch nicht erfolgreich gecrawlt — klick oben auf <em>crawl jetzt</em>.</p>
+  {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">änderungen</h2>
+    <span class="small muted"><span class="change-count">{{ changes|length }}</span> insgesamt</span>
+  </div>
+  {% if not changes %}
+    <p class="empty-state">noch keine inhaltlichen änderungen erkannt.</p>
+  {% else %}
+    {% for c in changes %}
+      <details class="change">
+        <summary>
+          <span class="text-soft">{{ c.created_at.strftime('%d.%m.%Y · %H:%M UTC') }}</span>
+          <span class="muted">·</span>
+          <span class="relative-time" data-at="{{ c.created_at.isoformat() }}">…</span>
+          <span class="muted">·</span>
+          tg {% if c.notified_telegram %}<span class="badge ok">sent</span>{% else %}<span class="badge err">miss</span>{% endif %}
+          mail {% if c.notified_email %}<span class="badge ok">sent</span>{% else %}<span class="badge err">miss</span>{% endif %}
+          {% if c.notify_error %}<span class="muted">·</span><span class="small" style="color:var(--err);">{{ c.notify_error }}</span>{% endif %}
+        </summary>
+        <pre class="diff" style="margin-top:14px;">{{ c.unified_diff }}</pre>
+      </details>
+    {% endfor %}
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">crawl-historie</h2>
+    <span class="small muted">letzte {{ crawls|length }}</span>
+  </div>
+  <table class="editorial-table">
+    <thead>
+      <tr><th>zeitpunkt</th><th>http</th><th>status</th><th>selektor</th><th>hash</th><th>fehler</th></tr>
+    </thead>
+    <tbody>
+    {% for c in crawls %}
+      <tr>
+        <td>{{ c.started_at.strftime('%d.%m.%Y · %H:%M:%S') }}</td>
+        <td>{{ c.http_status or '—' }}</td>
+        <td>
+          {% if c.finished_at is none %}<span class="badge warn">läuft</span>
+          {% elif c.ok %}<span class="badge ok">ok</span>
+          {% else %}<span class="badge err">fail</span>{% endif %}
+        </td>
+        <td>{% if c.matched_selector %}<code class="sel">{{ c.matched_selector }}</code>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="muted">{{ c.content_hash[:12] if c.content_hash else '—' }}</td>
+        <td style="color:var(--err);">{{ c.error_message or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

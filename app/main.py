@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from .db import init_db
+from .routes.ui import router as ui_router
+from .scheduler import shutdown as scheduler_shutdown
+from .scheduler import start as scheduler_start
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("boat-pulse")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    scheduler_start()
+    logger.info("startup complete")
+    try:
+        yield
+    finally:
+        scheduler_shutdown()
+        logger.info("shutdown complete")
+
+
+app = FastAPI(title="Boat Pulse", lifespan=lifespan)
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {"ok": True}
+
+
+app.include_router(ui_router)

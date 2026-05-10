@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: lets-get-a-boat:latest
+    container_name: lets-get-a-boat
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
