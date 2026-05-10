@@ -1,0 +1,67 @@
+# ---- secrets ----
+.env
+.env.local
+.env.*.local
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ---- virtual envs ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- runtime data ----
+data/
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+
+# ---- ide ----
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+.fleet/
+.zed/
+
+# ---- os ----
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ---- docker / build artefacts ----
+.docker/
+docker-compose.override.yml
+
+# ---- editor swap / backup ----
+*.swp
+*.swo
+*~
+.#*
+\#*\#

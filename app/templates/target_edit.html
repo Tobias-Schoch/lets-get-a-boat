@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{% if target %}edit {{ target.name }}{% else %}neues target{% endif %} · boat.pulse{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">{% if target %}target bearbeiten{% else %}neues target{% endif %}</h2>
+    {% if target %}<a class="btn subtle" href="/targets/{{ target.id }}">← zurück</a>{% else %}<a class="btn subtle" href="/">← overview</a>{% endif %}
+  </div>
+
+  <form class="stacked" method="post" action="{% if target %}/targets/{{ target.id }}/edit{% else %}/targets/new{% endif %}">
+    <div class="field">
+      <label for="name">name</label>
+      <input type="text" name="name" id="name" required value="{{ name }}" />
+    </div>
+    <div class="field">
+      <label for="url">url</label>
+      <input type="url" name="url" id="url" required value="{{ url }}" />
+    </div>
+    <div class="field">
+      <label for="selectors">css-selektoren · fallback-reihenfolge</label>
+      <textarea name="selectors" id="selectors" placeholder="section#content&#10;article.composedcontent-standardseite-konstanz">{{ selectors_text }}</textarea>
+      <span class="hint">eine pro zeile. erster treffer gewinnt. bei <code>application/json</code> wird das selektor-feld ignoriert — die JSON-response wird stable pretty-printed und gehasht.</span>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" name="enabled" id="enabled" value="true" {% if enabled %}checked{% endif %} />
+      <label for="enabled">aktiviert (wird automatisch alle {{ interval_minutes }} min gecrawlt)</label>
+    </div>
+    <p class="hint" style="margin:0;">
+      crawl-intervall ist global → <a href="/settings">settings</a>
+    </p>
+    <div class="actions-row">
+      <button class="btn primary" type="submit">speichern</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

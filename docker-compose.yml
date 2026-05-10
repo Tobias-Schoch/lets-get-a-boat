@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    image: lets-get-a-boat:latest
+    pull_policy: never            # local image only — never try to pull from a registry
+    container_name: lets-get-a-boat
+    restart: unless-stopped
+    environment:
+      # required — login for the UI
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-admin}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-change-me}
+      # required for notifications (set in Portainer env vars)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # operational defaults — usually no need to override
+      DATA_DIR: /data
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - boat-data:/data
+    ports:
+      - "3000:8000"
+
+volumes:
+  boat-data:

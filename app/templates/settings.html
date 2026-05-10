@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}settings · boat.pulse{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">credentials</h2>
+    <span class="small muted">aus environment / portainer</span>
+  </div>
+  <p class="hint" style="margin-top:-6px;">
+    Secrets liegen ausschließlich in env vars — diese seite zeigt nur, ob sie gesetzt sind.
+    Setze sie in Portainer in den Container-Umgebungsvariablen.
+  </p>
+
+  <div class="env-list">
+    {% for ev in env_vars %}
+      <div class="env-row {% if not ev.present %}is-missing{% endif %}">
+        <code class="env-key">{{ ev.key }}</code>
+        <div class="env-row-meta">
+          <span class="env-source">env</span>
+          {% if ev.present %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<form class="stacked" method="post" action="/settings">
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">scheduling</h2>
+      <span class="small muted">gilt für alle targets</span>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label for="crawl_interval_minutes">crawl-intervall (minuten)</label>
+        <input type="number" min="1" max="10080" name="crawl_interval_minutes" id="crawl_interval_minutes" value="{{ settings.crawl_interval_minutes }}" />
+        <span class="hint">änderung greift sofort für alle aktiven targets.</span>
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <label>presets</label>
+        <div class="row-actions" style="margin-top:6px;">
+          <button type="button" class="btn tiny subtle" data-preset="5">5min</button>
+          <button type="button" class="btn tiny subtle" data-preset="15">15min</button>
+          <button type="button" class="btn tiny subtle" data-preset="30">30min</button>
+          <button type="button" class="btn tiny subtle" data-preset="60">1h</button>
+          <button type="button" class="btn tiny subtle" data-preset="360">6h</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">adressen</h2>
+      <span class="small muted">aus datenbank · ui-editierbar</span>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label for="resend_from">from-adresse</label>
+        <input type="email" name="resend_from" id="resend_from" value="{{ settings.resend_from }}" placeholder="boat@deinedomain.de" />
+        <span class="hint">muss in resend verifiziert sein.</span>
+      </div>
+      <div class="field">
+        <label for="resend_to">an-adresse</label>
+        <input type="email" name="resend_to" id="resend_to" value="{{ settings.resend_to }}" placeholder="du@example.com" />
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">test-mutation</h2>
+      <span class="small muted">end-to-end notification check</span>
+    </div>
+    <p class="hint" style="margin-top:-6px;">
+      Wenn gesetzt, wird dieser Text nach jeder extraktion angehängt — der hash ändert sich,
+      der nächste crawl erkennt eine änderung und schickt eine echte notification an telegram + email.
+      Zum testen z.&nbsp;B. <code>x</code> setzen, speichern, in der overview auf <em>crawl jetzt</em> klicken,
+      und das feld danach wieder leeren.
+    </p>
+    <div class="field">
+      <label for="test_suffix">test-suffix</label>
+      <input type="text" name="test_suffix" id="test_suffix" value="{{ settings.test_suffix }}" placeholder="leer = aus" maxlength="500" />
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <span class="muted small">speichert intervall + adressen + test-suffix</span>
+    <button class="btn primary" type="submit">speichern</button>
+  </div>
+</form>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">test versand</h2>
+    <span class="small muted">setzt eine echte nachricht ab</span>
+  </div>
+  <div class="row-actions">
+    <form method="post" action="/settings/test-telegram"><button class="btn">telegram testen</button></form>
+    <form method="post" action="/settings/test-email"><button class="btn">email testen</button></form>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">wartung</h2>
+    <span class="small muted">irreversibel</span>
+  </div>
+  <p class="hint" style="margin-top:-6px;">
+    Löscht alle gespeicherten <em>crawls</em> und <em>änderungen</em> aus der DB und setzt die <code>last_*</code>-felder
+    aller targets zurück. Targets, settings und env-config bleiben unberührt. Die DB-datei wird danach mit <code>VACUUM</code> verkleinert.
+  </p>
+  <div class="row-actions">
+    <form method="post" action="/settings/wipe-history" onsubmit="return confirm('Wirklich alle crawls + änderungen löschen?');">
+      <button class="btn danger">verlauf löschen</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('[data-preset]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var input = document.getElementById('crawl_interval_minutes');
+      input.value = b.dataset.preset;
+      input.focus();
+    });
+  });
+</script>
+{% endblock %}

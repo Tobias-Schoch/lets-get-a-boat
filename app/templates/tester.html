@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}tester · boat.pulse{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">html-/json-tester</h2>
+    <span class="small muted">read-only · keine db-writes</span>
+  </div>
+  <div class="callout">
+    <strong>Stand-alone playground.</strong> Hier wird nichts in der Datenbank hinterlegt, kein target nötig — paste zwei HTML-/JSON-versionen und sieh sofort,
+    ob das System eine Notification ausgelöst hätte. JSON wird automatisch erkannt (content beginnt mit <code>{</code> oder <code>[</code>) und stable pretty-printed;
+    HTML wird vom rauschen (script, style, head, nav, footer, cookie-banner) befreit.
+  </div>
+
+  <form class="stacked" method="post" action="/tester">
+    <div class="two-col">
+      <div class="field">
+        <label for="html_a">vorher</label>
+        <textarea name="html_a" id="html_a" rows="16" placeholder='<html>…</html>  oder  {"foo": "bar"}'>{{ html_a }}</textarea>
+      </div>
+      <div class="field">
+        <label for="html_b">nachher</label>
+        <textarea name="html_b" id="html_b" rows="16" placeholder='<html>…</html>  oder  {"foo": "bar"}'>{{ html_b }}</textarea>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" name="send_test" id="send_test" value="true" {% if send_test %}checked{% endif %} />
+      <label for="send_test">bei "würde benachrichtigen" auch echt per telegram + email versenden</label>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn primary" type="submit">vergleichen</button>
+    </div>
+  </form>
+</div>
+
+{% if result %}
+<div class="panel">
+  <div class="panel-header">
+    <h2 class="section-title">ergebnis</h2>
+    {% if result.would_notify %}
+      <span class="badge ok">würde benachrichtigen</span>
+    {% else %}
+      <span class="badge idle">stille</span>
+    {% endif %}
+  </div>
+
+  <dl class="kv">
+    <dt>grund</dt>
+    <dd>{{ result.reason }}</dd>
+    <dt>hash a → b</dt>
+    <dd class="muted">{{ result.hash_a[:16] }} → {{ result.hash_b[:16] }}</dd>
+    <dt>scope a</dt>
+    <dd>
+      {% if result.matched_a %}<code class="sel">{{ result.matched_a }}</code>
+      {% elif result.fallback_a %}<code class="sel">auto · &lt;body&gt;</code>
+      {% else %}<span class="muted">—</span>{% endif %}
+    </dd>
+    <dt>scope b</dt>
+    <dd>
+      {% if result.matched_b %}<code class="sel">{{ result.matched_b }}</code>
+      {% elif result.fallback_b %}<code class="sel">auto · &lt;body&gt;</code>
+      {% else %}<span class="muted">—</span>{% endif %}
+    </dd>
+    {% if result.notify_status %}
+    <dt>test-versand</dt>
+    <dd>
+      telegram {% if result.notify_status.telegram == 'ok' %}<span class="badge ok">ok</span>{% else %}<span class="badge err">{{ result.notify_status.telegram }}</span>{% endif %}
+      &nbsp; email {% if result.notify_status.email == 'ok' %}<span class="badge ok">ok</span>{% else %}<span class="badge err">{{ result.notify_status.email }}</span>{% endif %}
+    </dd>
+    {% endif %}
+  </dl>
+
+  {% if result.diff %}
+    <h3 class="subhead">diff</h3>
+    <pre class="diff">{{ result.diff }}</pre>
+  {% endif %}
+
+  <div class="two-col">
+    <div>
+      <h3 class="subhead">extrahiert vorher</h3>
+      <pre class="text">{{ result.text_a }}</pre>
+    </div>
+    <div>
+      <h3 class="subhead">extrahiert nachher</h3>
+      <pre class="text">{{ result.text_b }}</pre>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
