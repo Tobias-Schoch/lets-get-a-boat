@@ -2,8 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppConfig(BaseSettings):
-    basic_auth_user: str = "admin"
-    basic_auth_password: str = "change-me"
     data_dir: str = "./data"
     tz: str = "Europe/Berlin"
 

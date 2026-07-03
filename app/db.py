@@ -79,6 +79,20 @@ def _migrate(conn) -> None:
         conn.exec_driver_sql(
             "ALTER TABLE settings ADD COLUMN test_suffix VARCHAR(500) DEFAULT ''"
         )
+    if "whatsapp_recipients" not in cols:
+        conn.exec_driver_sql("ALTER TABLE settings ADD COLUMN whatsapp_recipients TEXT")
+    if "telegram_bot_token" not in cols:
+        conn.exec_driver_sql("ALTER TABLE settings ADD COLUMN telegram_bot_token VARCHAR(200)")
+    if "telegram_chat_id" not in cols:
+        conn.exec_driver_sql("ALTER TABLE settings ADD COLUMN telegram_chat_id VARCHAR(100)")
+    if "resend_api_key" not in cols:
+        conn.exec_driver_sql("ALTER TABLE settings ADD COLUMN resend_api_key VARCHAR(200)")
+
+    change_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(change)").fetchall()}
+    if "notified_whatsapp" not in change_cols:
+        conn.exec_driver_sql(
+            "ALTER TABLE change ADD COLUMN notified_whatsapp BOOLEAN NOT NULL DEFAULT 0"
+        )
 
 
 def init_db() -> None:

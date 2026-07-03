@@ -5,19 +5,25 @@ from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, func, select, update
 
-from ..auth import require_basic_auth
 from ..config import config
 from ..crawler import run_crawl
 from ..db import SessionLocal, get_settings
 from ..diff import compute_diff
 from ..extract import extract_relevant
 from ..models import Change, Crawl, Settings, Target
-from ..notify import send_email, send_telegram, test_email, test_telegram
+from ..notify import (
+    send_email,
+    send_telegram,
+    send_whatsapp,
+    test_email,
+    test_telegram,
+    test_whatsapp,
+)
 from ..scheduler import (
     DEFAULT_INTERVAL_MINUTES,
     get_scheduler,
@@ -28,7 +34,7 @@ from ..scheduler import (
     upsert_job,
 )
 
-router = APIRouter(dependencies=[Depends(require_basic_auth)])
+router = APIRouter()
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -133,18 +139,13 @@ def _parse_selectors(text: str) -> list[str]:
     return [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
 
 
-def _env_status() -> list[dict[str, object]]:
-    """All boat-pulse env vars in display order with their present/missing state."""
-    fields = [
-        ("TELEGRAM_BOT_TOKEN", config.telegram_bot_token),
-        ("TELEGRAM_CHAT_ID", config.telegram_chat_id),
-        ("RESEND_API_KEY", config.resend_api_key),
-        ("BASIC_AUTH_USER", config.basic_auth_user),
-        ("BASIC_AUTH_PASSWORD", config.basic_auth_password),
-        ("DATA_DIR", config.data_dir),
-        ("TZ", config.tz),
-    ]
-    return [{"key": k, "present": bool((v or "").strip())} for k, v in fields]
+def _env_fallbacks() -> dict[str, bool]:
+    """Which credential env vars are set — shown as fallback hints in settings."""
+    return {
+        "telegram_bot_token": bool((config.telegram_bot_token or "").strip()),
+        "telegram_chat_id": bool((config.telegram_chat_id or "").strip()),
+        "resend_api_key": bool((config.resend_api_key or "").strip()),
+    }
 
 
 def _is_real_notify_error(notify_error: str | None) -> bool:
@@ -510,13 +511,17 @@ def settings_view(request: Request):
         settings = get_settings(s)
         ctx = {
             "settings": {
+                "telegram_bot_token": settings.telegram_bot_token or "",
+                "telegram_chat_id": settings.telegram_chat_id or "",
+                "resend_api_key": settings.resend_api_key or "",
                 "resend_from": settings.resend_from or "",
                 "resend_to": settings.resend_to or "",
+                "whatsapp_recipients": settings.whatsapp_recipients or "",
                 "crawl_interval_minutes": settings.crawl_interval_minutes or DEFAULT_INTERVAL_MINUTES,
                 "test_suffix": settings.test_suffix or "",
                 "updated_at": settings.updated_at,
             },
-            "env_vars": _env_status(),
+            "env_fallbacks": _env_fallbacks(),
             "flash": _flash(request),
         }
     return templates.TemplateResponse(request, "settings.html", ctx)
@@ -525,15 +530,23 @@ def settings_view(request: Request):
 @router.post("/settings")
 def settings_save(
     crawl_interval_minutes: int = Form(DEFAULT_INTERVAL_MINUTES),
+    telegram_bot_token: str = Form(""),
+    telegram_chat_id: str = Form(""),
+    resend_api_key: str = Form(""),
     resend_from: str = Form(""),
     resend_to: str = Form(""),
+    whatsapp_recipients: str = Form(""),
     test_suffix: str = Form(""),
 ):
     with SessionLocal() as s:
         settings = get_settings(s)
         settings.crawl_interval_minutes = max(1, int(crawl_interval_minutes))
+        settings.telegram_bot_token = telegram_bot_token.strip() or None
+        settings.telegram_chat_id = telegram_chat_id.strip() or None
+        settings.resend_api_key = resend_api_key.strip() or None
         settings.resend_from = resend_from.strip() or None
         settings.resend_to = resend_to.strip() or None
+        settings.whatsapp_recipients = whatsapp_recipients.strip() or None
         settings.test_suffix = test_suffix.strip() or None
         s.commit()
     reschedule_all()
@@ -572,14 +585,18 @@ async def settings_test_telegram():
 
 @router.post("/settings/test-email")
 async def settings_test_email():
-    with SessionLocal() as s:
-        settings = get_settings(s)
-        from_addr = settings.resend_from or ""
-        to_addr = settings.resend_to or ""
-    res = await test_email(from_addr=from_addr, to_addr=to_addr)
+    res = await test_email()
     if res.ok:
         return _flash_redirect("/settings", "ok", "Email-Test gesendet")
     return _flash_redirect("/settings", "error", f"Email-Test fehlgeschlagen: {res.error}")
+
+
+@router.post("/settings/test-whatsapp")
+async def settings_test_whatsapp():
+    res = await test_whatsapp()
+    if res.ok:
+        return _flash_redirect("/settings", "ok", "WhatsApp-Test gesendet")
+    return _flash_redirect("/settings", "error", f"WhatsApp-Test fehlgeschlagen: {res.error}")
 
 
 @router.get("/tester", response_class=HTMLResponse)
@@ -614,24 +631,15 @@ async def tester_run(
 
     notify_status: dict[str, str] | None = None
     if send_test and would_notify:
-        with SessionLocal() as s:
-            settings = get_settings(s)
-            from_addr = settings.resend_from or ""
-            to_addr = settings.resend_to or ""
         title = "Boat Pulse – HTML-Tester (echter Versand)"
         body = diff.unified_diff or "(kein Diff-Text – Erstvergleich)"
         tg = await send_telegram(title=title, url=None, body=body)
-        mail = await send_email(
-            subject=title,
-            title=title,
-            url=None,
-            body=body,
-            from_addr=from_addr,
-            to_addr=to_addr,
-        )
+        mail = await send_email(subject=title, title=title, url=None, body=body)
+        wa = await send_whatsapp(title=title, url=None, body=body)
         notify_status = {
             "telegram": "ok" if tg.ok else f"error: {tg.error}",
             "email": "ok" if mail.ok else f"error: {mail.error}",
+            "whatsapp": "ok" if wa.ok else f"error: {wa.error}",
         }
 
     return templates.TemplateResponse(

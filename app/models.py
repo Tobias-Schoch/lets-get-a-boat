@@ -72,6 +72,7 @@ class Change(Base):
     unified_diff: Mapped[str] = mapped_column(Text)
     notified_telegram: Mapped[bool] = mapped_column(Boolean, default=False)
     notified_email: Mapped[bool] = mapped_column(Boolean, default=False)
+    notified_whatsapp: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     notify_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -79,16 +80,22 @@ class Change(Base):
 
 
 class Settings(Base):
-    """Persistent UI-editable settings. Secret credentials live in env vars
-    (see :mod:`app.config`) — this table holds operational addresses and the
-    global crawl cadence used for every target."""
+    """Persistent UI-editable settings: credentials, addresses and the global
+    crawl cadence. Env vars (see :mod:`app.config`) act as fallback for the
+    credential fields so existing deployments keep working."""
 
     __tablename__ = "settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     crawl_interval_minutes: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
+    telegram_bot_token: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    resend_api_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     resend_from: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    resend_to: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Comma/semicolon/newline-separated list of recipient addresses.
+    resend_to: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # CallMeBot recipients, one "telefon:apikey" pair per line.
+    whatsapp_recipients: Mapped[str | None] = mapped_column(Text, nullable=True)
     # When non-empty, gets appended to every extraction → next crawl detects a
     # synthetic change → notification pipeline fires end-to-end. Clear to stop.
     test_suffix: Mapped[str | None] = mapped_column(String(500), nullable=True, server_default="")

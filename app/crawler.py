@@ -11,7 +11,7 @@ from .db import SessionLocal, get_settings, prune_target_history
 from .diff import compute_diff
 from .extract import extract_relevant
 from .models import Change, Crawl, Target
-from .notify import send_email, send_telegram
+from .notify import send_email, send_telegram, send_whatsapp
 
 logger = logging.getLogger(__name__)
 
@@ -146,34 +146,28 @@ async def run_crawl(target_id: int) -> None:
         return
 
     with SessionLocal() as s:
-        settings = get_settings(s)
         target = s.get(Target, target_id)
         if target is None:
             return
         title = f"Änderung erkannt: {target_name}"
         target_url = target.url
-        from_addr = settings.resend_from or ""
-        to_addr = settings.resend_to or ""
-    tg_res, mail_res = await asyncio.gather(
+    tg_res, mail_res, wa_res = await asyncio.gather(
         send_telegram(title=title, url=target_url, body=diff_to_notify),
-        send_email(
-            subject=title,
-            title=title,
-            url=target_url,
-            body=diff_to_notify,
-            from_addr=from_addr,
-            to_addr=to_addr,
-        ),
+        send_email(subject=title, title=title, url=target_url, body=diff_to_notify),
+        send_whatsapp(title=title, url=target_url, body=diff_to_notify),
     )
     with SessionLocal() as s:
         change = s.get(Change, change_id)
         if change is not None:
             change.notified_telegram = tg_res.ok
             change.notified_email = mail_res.ok
+            change.notified_whatsapp = wa_res.ok
             err_parts = []
             if not tg_res.ok and tg_res.error:
                 err_parts.append(f"telegram: {tg_res.error}")
             if not mail_res.ok and mail_res.error:
                 err_parts.append(f"email: {mail_res.error}")
+            if not wa_res.ok and wa_res.error:
+                err_parts.append(f"whatsapp: {wa_res.error}")
             change.notify_error = " | ".join(err_parts) or None
             s.commit()

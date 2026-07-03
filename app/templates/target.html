@@ -93,6 +93,7 @@
           <span class="muted">·</span>
           tg {% if c.notified_telegram %}<span class="badge ok">sent</span>{% else %}<span class="badge err">miss</span>{% endif %}
           mail {% if c.notified_email %}<span class="badge ok">sent</span>{% else %}<span class="badge err">miss</span>{% endif %}
+          wa {% if c.notified_whatsapp %}<span class="badge ok">sent</span>{% else %}<span class="badge err">miss</span>{% endif %}
           {% if c.notify_error %}<span class="muted">·</span><span class="small" style="color:var(--err);">{{ c.notify_error }}</span>{% endif %}
         </summary>
         <pre class="diff" style="margin-top:14px;">{{ c.unified_diff }}</pre>

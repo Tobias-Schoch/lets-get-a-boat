@@ -2,29 +2,6 @@
 {% block title %}settings · boat.pulse{% endblock %}
 {% block content %}
 
-<div class="panel">
-  <div class="panel-header">
-    <h2 class="section-title">credentials</h2>
-    <span class="small muted">aus environment / portainer</span>
-  </div>
-  <p class="hint" style="margin-top:-6px;">
-    Secrets liegen ausschließlich in env vars — diese seite zeigt nur, ob sie gesetzt sind.
-    Setze sie in Portainer in den Container-Umgebungsvariablen.
-  </p>
-
-  <div class="env-list">
-    {% for ev in env_vars %}
-      <div class="env-row {% if not ev.present %}is-missing{% endif %}">
-        <code class="env-key">{{ ev.key }}</code>
-        <div class="env-row-meta">
-          <span class="env-source">env</span>
-          {% if ev.present %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-</div>
-
 <form class="stacked" method="post" action="/settings">
   <div class="panel">
     <div class="panel-header">
@@ -52,8 +29,62 @@
 
   <div class="panel">
     <div class="panel-header">
-      <h2 class="section-title">adressen</h2>
-      <span class="small muted">aus datenbank · ui-editierbar</span>
+      <h2 class="section-title">telegram</h2>
+      <span class="small muted">push-nachricht an einen chat oder eine gruppe</span>
+    </div>
+    <details class="hint" style="margin-top:-6px; margin-bottom:12px;">
+      <summary style="cursor:pointer;">anleitung: bot-token &amp; chat-id besorgen</summary>
+      <ol style="margin:8px 0 0 18px; line-height:1.7;">
+        <li>In Telegram <strong>@BotFather</strong> öffnen, <code>/newbot</code> senden, namen vergeben →
+          BotFather antwortet mit dem <strong>bot-token</strong> (sieht aus wie <code>123456789:AAH…</code>).</li>
+        <li>Dem neuen bot eine beliebige nachricht schicken (er antwortet nicht — egal).</li>
+        <li>Im browser <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> öffnen →
+          in der antwort steht <code>"chat":{"id":123456789}</code> — das ist die <strong>chat-id</strong>.</li>
+        <li><strong>Mehrere leute?</strong> Eine telegram-gruppe erstellen, den bot hinzufügen, in der gruppe
+          etwas schreiben und wieder <code>getUpdates</code> aufrufen — gruppen-ids sind negativ
+          (z.&nbsp;B. <code>-100123…</code>).</li>
+      </ol>
+    </details>
+    <div class="two-col">
+      <div class="field">
+        <label for="telegram_bot_token">bot-token</label>
+        <input type="text" name="telegram_bot_token" id="telegram_bot_token" value="{{ settings.telegram_bot_token }}" placeholder="123456789:AAH…" autocomplete="off" spellcheck="false" />
+        <span class="hint">leer = fallback auf env var <code>TELEGRAM_BOT_TOKEN</code>
+          {% if env_fallbacks.telegram_bot_token %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}
+        </span>
+      </div>
+      <div class="field">
+        <label for="telegram_chat_id">chat-id</label>
+        <input type="text" name="telegram_chat_id" id="telegram_chat_id" value="{{ settings.telegram_chat_id }}" placeholder="123456789 oder -100123456789" autocomplete="off" spellcheck="false" />
+        <span class="hint">leer = fallback auf env var <code>TELEGRAM_CHAT_ID</code>
+          {% if env_fallbacks.telegram_chat_id %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">email (resend)</h2>
+      <span class="small muted">mail an beliebig viele adressen</span>
+    </div>
+    <details class="hint" style="margin-top:-6px; margin-bottom:12px;">
+      <summary style="cursor:pointer;">anleitung: resend einrichten</summary>
+      <ol style="margin:8px 0 0 18px; line-height:1.7;">
+        <li>Kostenloses konto auf <code>resend.com</code> anlegen.</li>
+        <li>Unter <strong>API Keys</strong> einen key erstellen (beginnt mit <code>re_</code>) und hier eintragen.</li>
+        <li>Unter <strong>Domains</strong> die eigene domain verifizieren (DNS-einträge setzen) —
+          die from-adresse muss zu dieser domain gehören.</li>
+        <li>Nur zum ausprobieren geht auch <code>onboarding@resend.dev</code> als from-adresse,
+          damit darf aber nur an die eigene account-email geschickt werden.</li>
+      </ol>
+    </details>
+    <div class="field">
+      <label for="resend_api_key">api-key</label>
+      <input type="text" name="resend_api_key" id="resend_api_key" value="{{ settings.resend_api_key }}" placeholder="re_…" autocomplete="off" spellcheck="false" />
+      <span class="hint">leer = fallback auf env var <code>RESEND_API_KEY</code>
+        {% if env_fallbacks.resend_api_key %}<span class="badge ok">gesetzt</span>{% else %}<span class="badge err">fehlt</span>{% endif %}
+      </span>
     </div>
     <div class="two-col">
       <div class="field">
@@ -62,9 +93,33 @@
         <span class="hint">muss in resend verifiziert sein.</span>
       </div>
       <div class="field">
-        <label for="resend_to">an-adresse</label>
-        <input type="email" name="resend_to" id="resend_to" value="{{ settings.resend_to }}" placeholder="du@example.com" />
+        <label for="resend_to">an-adressen</label>
+        <input type="text" name="resend_to" id="resend_to" value="{{ settings.resend_to }}" placeholder="du@example.com, sie@example.com" />
+        <span class="hint">mehrere adressen mit komma trennen.</span>
       </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="section-title">whatsapp (callmebot)</h2>
+      <span class="small muted">nachricht direkt aufs handy</span>
+    </div>
+    <details class="hint" style="margin-top:-6px; margin-bottom:12px;">
+      <summary style="cursor:pointer;">anleitung: callmebot freischalten (pro empfänger einmalig)</summary>
+      <ol style="margin:8px 0 0 18px; line-height:1.7;">
+        <li>Die nummer <strong>+34&nbsp;644&nbsp;51&nbsp;95&nbsp;23</strong> als kontakt speichern.</li>
+        <li>Ihr per WhatsApp <code>I allow callmebot to send me messages</code> schicken.</li>
+        <li>Der bot antwortet mit einem persönlichen <strong>apikey</strong> — unten als
+          <code>telefon:apikey</code> eintragen.</li>
+        <li>Das muss <em>jeder</em> empfänger von seinem eigenen handy aus machen.
+          Details: <code>callmebot.com/blog/free-api-whatsapp-messages/</code></li>
+      </ol>
+    </details>
+    <div class="field">
+      <label for="whatsapp_recipients">empfänger (eine zeile pro person: telefon:apikey)</label>
+      <textarea name="whatsapp_recipients" id="whatsapp_recipients" rows="3" placeholder="+491701234567:123456&#10;+491709876543:654321">{{ settings.whatsapp_recipients }}</textarea>
+      <span class="hint">leer = whatsapp aus.</span>
     </div>
   </div>
 
@@ -75,7 +130,7 @@
     </div>
     <p class="hint" style="margin-top:-6px;">
       Wenn gesetzt, wird dieser Text nach jeder extraktion angehängt — der hash ändert sich,
-      der nächste crawl erkennt eine änderung und schickt eine echte notification an telegram + email.
+      der nächste crawl erkennt eine änderung und schickt eine echte notification an telegram + email + whatsapp.
       Zum testen z.&nbsp;B. <code>x</code> setzen, speichern, in der overview auf <em>crawl jetzt</em> klicken,
       und das feld danach wieder leeren.
     </p>
@@ -86,7 +141,7 @@
   </div>
 
   <div class="save-bar">
-    <span class="muted small">speichert intervall + adressen + test-suffix</span>
+    <span class="muted small">speichert intervall + keys + adressen + test-suffix</span>
     <button class="btn primary" type="submit">speichern</button>
   </div>
 </form>
@@ -94,11 +149,12 @@
 <div class="panel">
   <div class="panel-header">
     <h2 class="section-title">test versand</h2>
-    <span class="small muted">setzt eine echte nachricht ab</span>
+    <span class="small muted">setzt eine echte nachricht ab · vorher speichern!</span>
   </div>
   <div class="row-actions">
     <form method="post" action="/settings/test-telegram"><button class="btn">telegram testen</button></form>
     <form method="post" action="/settings/test-email"><button class="btn">email testen</button></form>
+    <form method="post" action="/settings/test-whatsapp"><button class="btn">whatsapp testen</button></form>
   </div>
 </div>
 

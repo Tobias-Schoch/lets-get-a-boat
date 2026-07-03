@@ -27,7 +27,7 @@
 
     <div class="checkbox-row">
       <input type="checkbox" name="send_test" id="send_test" value="true" {% if send_test %}checked{% endif %} />
-      <label for="send_test">bei "würde benachrichtigen" auch echt per telegram + email versenden</label>
+      <label for="send_test">bei "würde benachrichtigen" auch echt per telegram + email + whatsapp versenden</label>
     </div>
 
     <div class="actions-row">
@@ -69,6 +69,7 @@
     <dd>
       telegram {% if result.notify_status.telegram == 'ok' %}<span class="badge ok">ok</span>{% else %}<span class="badge err">{{ result.notify_status.telegram }}</span>{% endif %}
       &nbsp; email {% if result.notify_status.email == 'ok' %}<span class="badge ok">ok</span>{% else %}<span class="badge err">{{ result.notify_status.email }}</span>{% endif %}
+      &nbsp; whatsapp {% if result.notify_status.whatsapp == 'ok' %}<span class="badge ok">ok</span>{% else %}<span class="badge err">{{ result.notify_status.whatsapp }}</span>{% endif %}
     </dd>
     {% endif %}
   </dl>
