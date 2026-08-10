@@ -15,8 +15,26 @@ services:
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - boat-data:/data
+    # This was published on every address, so the site was also reachable at
+    # http://<vps-ip>:3000 — bypassing the reverse proxy, without TLS. Nobody
+    # noticed because Docker writes its port publications straight into
+    # iptables and bypasses ufw: "ufw status" does not list such a port.
+    #
+    # It stays for now. Remove it once the Nginx Proxy Manager host points at
+    # "lets-get-a-boat:8000" instead of "217.72.203.69:3000" — in that order,
+    # otherwise the site drops out in the gap between the two.
     ports:
       - "3000:8000"
+    networks:
+      - npm
 
 volumes:
   boat-data:
+
+# Shared network with the Nginx Proxy Manager. It reaches the container by
+# name there, so no port has to be open on the host. Must already exist or the
+# stack refuses to start:  docker network create npm-network
+networks:
+  npm:
+    external: true
+    name: npm-network
